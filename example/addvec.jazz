@@ -1,0 +1,76 @@
+param int VLEN = 128;
+
+fn addvec_for(reg ptr u32[VLEN] r a b) -> stack u32[VLEN] 
+{
+  inline int i;
+  reg u32 t;
+
+  for i = 0 to VLEN {
+    t = a[i];
+    t += b[i];
+    r[i] = t;
+  }
+  
+  return r;
+}
+
+fn addvec_while(reg ptr u32[VLEN] r a b) -> stack u32[VLEN] 
+{
+  reg u64 i;
+  reg u32 t;
+
+  i = 0;
+  while (i < VLEN) {
+    t = a[(int)i];
+    t += b[(int)i];
+    r[(int)i] = t;
+    i += 1;
+  }
+  
+  return r;
+}
+
+fn addvec_avx2(reg ptr u32[VLEN] r a b) -> stack u32[VLEN] 
+{
+  inline int i;
+  reg u256 t0, t1;
+
+  for i = 0 to VLEN/8 {
+    t0 = a.[u256 (int)(32 *64u i)];
+    t1 = b.[u256 (int)(32 *64u i)];
+    t0 = #VPADD_8u32(t0, t1);
+    r.[u256 (int)(32 *64u i)] = t0;
+  }
+  
+  return r;
+}
+
+
+export fn addvec_jasmin3x(reg u64 rp0 rp1 rp2 ap bp) 
+{
+  inline int i;
+  stack u32[VLEN] a;
+  stack u32[VLEN] b;
+  stack u32[VLEN] r0, r1, r2;
+  reg u32 t0, t1, t;
+
+  for i = 0 to VLEN {
+    t0 = (u32)[ap + 4*i];
+    a[i] = t0;
+    t1 = (u32)[bp + 4*i];
+    b[i] = t1;
+  }
+
+  r0 = addvec_for(r0, a, b);
+  r1 = addvec_while(r1, a, b);
+  r2 = addvec_avx2(r2, a, b);
+
+  for i = 0 to VLEN {
+    t = r0[i];
+    (u32)[rp0 + 4*i] = t;
+    t = r1[i];
+    (u32)[rp1 + 4*i] = t;
+    t = r2[i];
+    (u32)[rp2 + 4*i] = t;
+  }
+}

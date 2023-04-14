@@ -1,0 +1,31 @@
+# WARNING: Enabling/disabling this workaround requires using
+# `podman system reset` WHICH IS DESTRUCTIVE.  This also means
+# that the container image needs to be built with the workaround
+# in place, which takes forever.
+#
+# podman behaves differently than Docker and will always mount
+# bind mounts with `root:root` as the owner unless effort is
+# made to remap things.  The official solution to this problem
+# is supposed to be `--userns=keep-id`, however this is badly
+# broken if your images are large especially if you do not use
+# btrfs.
+#
+# Sticking this in `$HOME/.config/containers/storage.conf` works
+# around the hang, with the tradeoff of absolutely murdering
+# performance due to the fuse overhead.
+#
+# FWIW fuse-overlayfs was installed by default on fc37, and I
+# assume that the primary reason why anyone would use this
+# podman nonsense over Docker is because they are on Fedora.
+#
+# See:
+#  * https://github.com/containers/podman/issues/2898
+#  * https://github.com/containers/podman/issues/16541
+#  * https://github.com/containers/podman/issues/17933
+#  * https://github.com/containers/fuse-overlayfs
+
+[storage]
+driver = "overlay"
+
+[storage.options.overlay]
+mount_program = "/usr/bin/fuse-overlayfs"

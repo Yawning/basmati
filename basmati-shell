@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+#
+# basmati-shell: Launch a container for jasmin development
+#
+
+set -eu
+
+: ${BASMATI_IMAGE_TAG=}
+: ${BASMATI_CONTAINER_CMD=}
+: ${BASMATI_SELINUX=}
+
+if [ ! "$BASMATI_IMAGE_TAG" ]; then
+  BASMATI_IMAGE_TAG="basmati"
+fi
+
+if [ ! "$BASMATI_CONTAINER_CMD" ]; then
+  # It would want to default to docker as the bind-mount situation is
+  # supposedly less shit than podman, but there is stupidity like
+  # https://packages.debian.org/sid/podman-docker in the wild, so
+  # podman needs to be detected first.
+  if which podman > /dev/null 2>&1; then
+    BASMATI_CONTAINER_CMD=podman
+  elif which docker > /dev/null 2>&1; then
+    BASMATI_CONTAINER_CMD=docker
+  else
+    echo "unable to find container command"
+    exit 1
+  fi
+fi
+
+: ${BASMATI_CONTAINER_EXTRA_ARGS=}
+if [ ! "$BASMATI_CONTAINER_EXTRA_ARGS" ]; then
+  if [ "$BASMATI_CONTAINER_CMD" == "podman" ]; then
+    # https://github.com/containers/podman/issues/2898
+    # https://github.com/containers/podman/issues/16541
+    BASMATI_CONTAINER_EXTRA_ARGS="--userns=keep-id"
+  fi
+fi
+
+: ${BASMATI_MOUNT_OPTS=}
+if [ "$BASMATI_SELINUX" ]; then
+  # https://docs.docker.com/storage/bind-mounts/#configure-the-selinux-label
+  # https://unix.stackexchange.com/questions/240813/how-to-remove-selinux-label
+  BASMATI_MOUNT_OPTS=":z"
+fi
+
+# Launch a new container that:
+#  * Is interactive
+#  * Will be removed on exit
+#  * Deals with podman brain damage
+#  * Bind mounts the current working directory as /data
+#  * With the working directory set to /data
+#  * Running as the opam user
+
+$BASMATI_CONTAINER_CMD run -it --rm $BASMATI_CONTAINER_EXTRA_ARGS \
+  -v "$(pwd)":/data"$BASMATI_MOUNT_OPTS" \
+  -w /data \
+  --user opam \
+  ${BASMATI_IMAGE_TAG}
